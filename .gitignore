@@ -1,0 +1,36 @@
+# ── Environment & secrets ──
+.env
+
+# ── Python cache ──
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ── Generated output ──
+output/chunks/
+output/final/
+output/progress.json
+
+# ── Logs ──
+logs/
+
+# ── Input PDFs (user-specific) ──
+input/
+
+# ── Bark model weights ──
+models/
+
+# ── IDE / Editor ──
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+
+# ── Conda / venv ──
+env/
+venv/
+.venv/
