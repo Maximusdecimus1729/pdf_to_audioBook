@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Bark Reader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- ─────────────────────────────────────────
+         BACKGROUND GRID (pure CSS atmosphere)
+    ───────────────────────────────────────── -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+
+    <!-- ─────────────────────────────────────────
+         HEADER
+    ───────────────────────────────────────── -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <!-- Animated waveform bars next to the title -->
+                <div class="waveform" id="headerWave">
+                    <span></span><span></span><span></span>
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="logo-text">
+                    <h1>PDF<span class="accent">BARK</span></h1>
+                    <p class="tagline">// AI AUDIOBOOK GENERATOR</p>
+                </div>
+            </div>
+            <!-- Live status pill in top right -->
+            <div class="status-pill" id="statusPill">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">IDLE</span>
+            </div>
+        </div>
+    </header>
+
+
+    <!-- ─────────────────────────────────────────
+         MAIN LAYOUT
+         Two columns:
+           Left  → Upload + Options + Controls
+           Right → Live progress log
+    ───────────────────────────────────────── -->
+    <main class="main-layout">
+
+
+        <!-- ── LEFT PANEL ── -->
+        <section class="panel panel-left">
+
+
+            <!-- Upload Zone -->
+            <div class="card upload-card" id="uploadCard">
+                <div class="card-label">// 01 — INPUT</div>
+
+                <!-- Drag and drop zone -->
+                <!-- The hidden file input is triggered when user clicks anywhere in this zone -->
+                <div class="drop-zone" id="dropZone">
+                    <input
+                        type="file"
+                        id="pdfInput"
+                        accept=".pdf"
+                        style="display:none"
+                    />
+                    <div class="drop-icon">
+                        <!-- SVG book icon -->
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+                        </svg>
+                    </div>
+                    <p class="drop-title">DROP PDF HERE</p>
+                    <p class="drop-sub">or click to browse</p>
+                    <!-- File name appears here after selection -->
+                    <div class="file-selected" id="fileSelected" style="display:none">
+                        <span class="file-icon">▸</span>
+                        <span id="fileName"></span>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Options Card -->
+            <div class="card options-card">
+                <div class="card-label">// 02 — OPTIONS</div>
+
+                <!-- Voice selector -->
+                <div class="option-group">
+                    <label class="option-label">VOICE PRESET</label>
+                    <select class="option-select" id="voiceSelect">
+                        <option value="v2/en_speaker_0">en_speaker_0 — Male, Deep</option>
+                        <option value="v2/en_speaker_1">en_speaker_1 — Male, Neutral</option>
+                        <option value="v2/en_speaker_2">en_speaker_2 — Male, Clear</option>
+                        <option value="v2/en_speaker_3">en_speaker_3 — Male, Expressive</option>
+                        <option value="v2/en_speaker_4">en_speaker_4 — Male, Soft</option>
+                        <option value="v2/en_speaker_5">en_speaker_5 — Female, Neutral</option>
+                        <option value="v2/en_speaker_6" selected>en_speaker_6 — Male, Natural ★</option>
+                        <option value="v2/en_speaker_7">en_speaker_7 — Female, Clear</option>
+                        <option value="v2/en_speaker_8">en_speaker_8 — Female, Expressive</option>
+                        <option value="v2/en_speaker_9">en_speaker_9 — Female, Soft</option>
+                    </select>
+                </div>
+
+                <!-- Reset toggle -->
+                <div class="option-group toggle-group">
+                    <div class="toggle-info">
+                        <label class="option-label">RESET PROGRESS</label>
+                        <p class="option-desc">Ignore saved progress, start from chunk 0</p>
+                    </div>
+                    <!-- Custom toggle switch -->
+                    <label class="toggle">
+                        <input type="checkbox" id="resetToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+
+            <!-- Action Buttons Card -->
+            <div class="card controls-card">
+                <div class="card-label">// 03 — CONTROLS</div>
+
+                <div class="button-grid">
+
+                    <!-- Primary action — starts the full pipeline -->
+                    <button class="btn btn-primary" id="btnGenerate">
+                        <span class="btn-icon">▶</span>
+                        GENERATE AUDIOBOOK
+                    </button>
+
+                    <!-- Stop — halts TTS generation mid-run, hidden when idle -->
+                    <button class="btn btn-stop" id="btnStop">
+                        <span class="btn-icon">■</span>
+                        STOP GENERATION
+                    </button>
+
+                    <!-- Merge only — stitches existing chunks without re-running Bark -->
+                    <button class="btn btn-secondary" id="btnMerge">
+                        <span class="btn-icon">⊕</span>
+                        MERGE CHUNKS ONLY
+                    </button>
+
+                    <!-- Clear output — deletes chunks, final wav and progress file -->
+                    <button class="btn btn-clear" id="btnClear">
+                        <span class="btn-icon">✕</span>
+                        CLEAR OUTPUT
+                    </button>
+
+                    <!-- Download — only active after successful generation -->
+                    <button class="btn btn-download" id="btnDownload" disabled>
+                        <span class="btn-icon">↓</span>
+                        DOWNLOAD AUDIOBOOK
+                    </button>
+
+                </div>
+
+                <!-- Terminal hint for nerds -->
+                <div class="terminal-hint">
+                    <span class="hint-label">// terminal equivalent</span>
+                    <code id="terminalCmd">python main.py --pdf input/book.pdf</code>
+                </div>
+            </div>
+
+
+        </section>
+
+
+        <!-- ── RIGHT PANEL ── -->
+        <section class="panel panel-right">
+
+            <!-- Progress Card -->
+            <div class="card progress-card">
+                <div class="card-label">// 04 — PROGRESS</div>
+
+                <!-- Stage indicators — light up as each stage completes -->
+                <div class="stages">
+                    <div class="stage" id="stage1">
+                        <div class="stage-dot"></div>
+                        <div class="stage-info">
+                            <span class="stage-name">EXTRACT</span>
+                            <span class="stage-desc">PDF → text</span>
+                        </div>
+                    </div>
+                    <div class="stage-connector"></div>
+                    <div class="stage" id="stage2">
+                        <div class="stage-dot"></div>
+                        <div class="stage-info">
+                            <span class="stage-name">PROCESS</span>
+                            <span class="stage-desc">text → chunks</span>
+                        </div>
+                    </div>
+                    <div class="stage-connector"></div>
+                    <div class="stage" id="stage3">
+                        <div class="stage-dot"></div>
+                        <div class="stage-info">
+                            <span class="stage-name">GENERATE</span>
+                            <span class="stage-desc">chunks → audio</span>
+                        </div>
+                    </div>
+                    <div class="stage-connector"></div>
+                    <div class="stage" id="stage4">
+                        <div class="stage-dot"></div>
+                        <div class="stage-info">
+                            <span class="stage-name">MERGE</span>
+                            <span class="stage-desc">audio → book</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main progress bar -->
+                <div class="progress-bar-container">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+                        <!-- Animated scanner line that rides along the progress bar -->
+                        <div class="progress-scanner" id="progressScanner"></div>
+                    </div>
+                    <div class="progress-meta">
+                        <span id="progressPercent">0%</span>
+                        <span id="progressEta" class="eta">—</span>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- Live Log Card -->
+            <div class="card log-card">
+                <div class="card-label-row">
+                    <span class="card-label">// 05 — LIVE LOG</span>
+                    <!-- Auto-scroll toggle -->
+                    <label class="autoscroll-toggle">
+                        <input type="checkbox" id="autoScroll" checked>
+                        <span>AUTO-SCROLL</span>
+                    </label>
+                </div>
+
+                <!-- Log entries stream in here in real time -->
+                <!-- Each entry is added by script.js as SSE messages arrive -->
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry log-idle">
+                        <span class="log-time">--:--:--</span>
+                        <span class="log-msg">Waiting for input. Upload a PDF to begin.</span>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- Result Card — hidden until job completes -->
+            <div class="card result-card" id="resultCard" style="display:none">
+                <div class="card-label">// 06 — RESULT</div>
+                <div class="result-inner">
+                    <div class="result-icon" id="resultIcon">🎉</div>
+                    <div class="result-text" id="resultText">Audiobook ready!</div>
+                    <div class="result-sub" id="resultSub"></div>
+                </div>
+            </div>
+
+
+            <!-- GPU Monitor Card -->
+            <div class="card gpu-card">
+                <div class="card-label">// 07 — GPU MONITOR</div>
+
+                <div id="gpuUnavailable" style="display:none">
+                    <p class="gpu-no-device">— No NVIDIA GPU detected —</p>
+                </div>
+
+                <div id="gpuMetrics">
+                    <p class="gpu-device-name" id="gpuName">Detecting GPU...</p>
+
+                    <div class="gpu-metric">
+                        <div class="gpu-metric-header">
+                            <span class="gpu-metric-label">TEMPERATURE</span>
+                            <span class="gpu-metric-value" id="gpuTemp">—</span>
+                        </div>
+                        <div class="gpu-bar-track">
+                            <div class="gpu-bar-fill" id="gpuTempBar" style="width:0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="gpu-metric">
+                        <div class="gpu-metric-header">
+                            <span class="gpu-metric-label">GPU LOAD</span>
+                            <span class="gpu-metric-value" id="gpuUtil">—</span>
+                        </div>
+                        <div class="gpu-bar-track">
+                            <div class="gpu-bar-fill gpu-bar-util" id="gpuUtilBar" style="width:0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="gpu-metric">
+                        <div class="gpu-metric-header">
+                            <span class="gpu-metric-label">VRAM</span>
+                            <div class="gpu-mem-values">
+                                <span class="gpu-metric-value" id="gpuMemUsed">—</span>
+                                <span class="gpu-mem-sep">/</span>
+                                <span class="gpu-metric-sub" id="gpuMemTotal">—</span>
+                            </div>
+                        </div>
+                        <div class="gpu-bar-track">
+                            <div class="gpu-bar-fill gpu-bar-mem" id="gpuMemBar" style="width:0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+        </section>
+
+    </main>
+
+
+    <!-- ─────────────────────────────────────────
+         FOOTER
+    ───────────────────────────────────────── -->
+    <footer class="footer">
+        <span>PDF BARK READER</span>
+        <span class="footer-sep">×</span>
+        <span>Powered by Suno Bark TTS</span>
+        <span class="footer-sep">×</span>
+        <span>Running on localhost:5000</span>
+    </footer>
+
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

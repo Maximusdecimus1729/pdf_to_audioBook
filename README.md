@@ -1,10 +1,10 @@
-# 📚 PDF Bark Reader
+# PDF Bark Reader
 Convert any PDF book into a natural-sounding audiobook using
 Suno's Bark AI text-to-speech model.
 
 ---
 
-## 🧠 How It Works
+## How It Works
 ```
 PDF File
   → Extract text page by page        (PyMuPDF)
@@ -12,19 +12,19 @@ PDF File
   → Break into Bark-safe chunks       (text_processor)
   → Convert each chunk to audio       (Bark TTS)
   → Merge all chunks into one file    (scipy + numpy)
-  → audiobook.wav ✅
+  → audiobook.wav
 ```
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 ```
 pdf-bark-reader/
-├── main.py                  # Entry point — runs the full pipeline
+├── main.py                  # CLI entry point — runs the full pipeline
+├── app.py                   # Web UI entry point — Flask server on port 5000
 ├── config.py                # All settings live here (voice, paths, device)
 ├── requirements.txt         # Python dependencies
 ├── .env                     # Your personal machine settings (GPU/CPU)
-├── README.md                # This file
 │
 ├── input/                   # Drop your PDF books here
 ├── output/
@@ -33,6 +33,11 @@ pdf-bark-reader/
 │   └── progress.json        # Auto-saved progress tracker
 ├── models/                  # Bark model weights cached here
 ├── logs/                    # run.log lives here
+├── templates/
+│   └── index.html           # Web UI template
+├── static/
+│   ├── style.css            # Dark-theme stylesheet
+│   └── script.js            # UI logic (SSE, GPU polling, controls)
 └── src/
     ├── pdf_extractor.py     # Opens PDF, extracts and cleans text
     ├── text_processor.py    # Splits text into Bark-safe chunks
@@ -43,7 +48,7 @@ pdf-bark-reader/
 
 ---
 
-## ⚙️ Requirements
+## Requirements
 
 - Python 3.10
 - Anaconda (recommended)
@@ -52,7 +57,7 @@ pdf-bark-reader/
 
 ---
 
-## 🚀 Setup & Installation
+## Setup & Installation
 
 ### Step 1 — Clone or download the project
 ```bash
@@ -96,43 +101,86 @@ DEVICE=cpu    # if you have no GPU
 
 ---
 
-## 📖 Usage
+## Usage
 
-### Basic run (uses input/book.pdf by default)
+### Web UI (recommended)
 ```bash
+python app.py
+```
+Then open `http://localhost:5000` in your browser.
+
+### CLI
+```bash
+# Basic run (uses input/book.pdf by default)
 python main.py
-```
 
-### Specify a PDF file
-```bash
+# Specify a PDF file
 python main.py --pdf input/mybook.pdf
-```
 
-### Use a different voice
-```bash
+# Use a different voice
 python main.py --pdf input/mybook.pdf --voice v2/en_speaker_3
-```
 
-### Reset progress and start fresh
-```bash
+# Reset progress and start fresh
 python main.py --pdf input/mybook.pdf --reset
-```
 
-### Re-merge existing chunks without re-running Bark
-```bash
+# Re-merge existing chunks without re-running Bark
 python main.py --merge-only
-```
 
-### See all options
-```bash
+# See all options
 python main.py --help
 ```
 
 ---
 
-## 🎙️ Available Voices
+## Web UI Features
 
-Change the voice in `config.py` or via `--voice` flag.
+The web interface (`app.py`) exposes the full pipeline through a dark-theme single-page app.
+
+### Controls — `// 03`
+| Button | Description |
+|--------|-------------|
+| `▶ GENERATE AUDIOBOOK` | Upload PDF and run the full pipeline |
+| `■ STOP GENERATION` | Gracefully halt TTS mid-run (visible only while running); progress is preserved — resume any time |
+| `⊕ MERGE CHUNKS ONLY` | Stitch already-generated chunks into a final WAV without re-running Bark |
+| `✕ CLEAR OUTPUT` | Delete all chunks, the final WAV, and the progress file to start completely clean |
+| `↓ DOWNLOAD AUDIOBOOK` | Download the finished `audiobook.wav` (enabled after successful run) |
+
+### Progress — `// 04`
+Live stage indicators (EXTRACT → PROCESS → GENERATE → MERGE), a progress bar with animated scanner, and a running ETA readout.
+
+### Live Log — `// 05`
+Real-time log stream via SSE with auto-scroll toggle.
+
+### GPU Monitor — `// 07`
+Live hardware readout, polled every 2 seconds via `nvidia-smi`:
+
+| Metric | Display |
+|--------|---------|
+| GPU name | Gold header |
+| Temperature | Colour bar: green < 65°C → gold < 80°C → red |
+| GPU load | Gold gradient bar, 0–100% |
+| VRAM used / total | Blue gradient bar |
+
+Requires an NVIDIA GPU and `nvidia-smi` in PATH. Shows "No NVIDIA GPU detected" otherwise.
+
+### API Routes
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/` | GET | Web UI |
+| `/upload` | POST | Start pipeline (PDF + voice + reset flag) |
+| `/stream` | GET | SSE progress stream |
+| `/status` | GET | `{is_running, last_result}` — used for page-load reconnection |
+| `/stop` | POST | Signal the running pipeline to stop after the current chunk |
+| `/clear` | POST | Delete chunks, final WAV, and progress file |
+| `/merge` | POST | Merge-only mode |
+| `/download` | GET | Download finished audiobook |
+| `/gpu_stats` | GET | `{available, name, temperature, utilization, memory_used, memory_total}` |
+
+---
+
+## Available Voices
+
+Change the voice in `config.py` or via `--voice` flag (CLI) / voice selector (web UI).
 
 | Preset | Style |
 |--------|-------|
@@ -142,14 +190,14 @@ Change the voice in `config.py` or via `--voice` flag.
 | `v2/en_speaker_3` | Male, expressive |
 | `v2/en_speaker_4` | Male, soft |
 | `v2/en_speaker_5` | Female, neutral |
-| `v2/en_speaker_6` | Male, natural ← default |
+| `v2/en_speaker_6` | Male, natural — default |
 | `v2/en_speaker_7` | Female, clear |
 | `v2/en_speaker_8` | Female, expressive |
 | `v2/en_speaker_9` | Female, soft |
 
 ---
 
-## ⚡ Performance Expectations
+## Performance Expectations
 
 | Hardware | Per Chunk | 500 Chunk Book |
 |----------|-----------|----------------|
@@ -162,25 +210,26 @@ Change the voice in `config.py` or via `--voice` flag.
 
 ---
 
-## 🔁 Resume After Interruption
+## Resume After Interruption
 
-If the process is interrupted (Ctrl+C, crash, power cut):
+If the process is interrupted (Ctrl+C, STOP button, crash, power cut):
 ```bash
-# Just run the exact same command again
+# Just run the same command again — or re-upload in the web UI
 python main.py --pdf input/mybook.pdf
 ```
 
 Progress is saved after every single chunk. You will
 automatically resume from where you left off.
 
-To start completely fresh instead:
+To start completely fresh:
 ```bash
 python main.py --pdf input/mybook.pdf --reset
+# or click CLEAR OUTPUT + GENERATE AUDIOBOOK in the web UI
 ```
 
 ---
 
-## 🔧 Configuration Reference
+## Configuration Reference
 
 All settings are in `config.py`:
 
@@ -197,7 +246,7 @@ All settings are in `config.py`:
 
 ---
 
-## ⚠️ Known Limitations
+## Known Limitations
 
 **Scanned PDFs won't work**
 Scanned books are images of text — not real text.
@@ -219,7 +268,7 @@ English gives the best results by far.
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 **"PDF file not found"**
 → Make sure your PDF is inside the `input/` folder
@@ -241,16 +290,15 @@ English gives the best results by far.
 → Make sure PyTorch was installed BEFORE requirements.txt
 → Confirm Python version is exactly 3.10
 
+**GPU monitor shows "No NVIDIA GPU detected"**
+→ Confirm `nvidia-smi` is installed and accessible in your PATH
+→ On CPU-only machines this is expected and harmless
+
 ---
 
-
-
----
-
-## 🙏 Credits
+## Credits
 - [Suno Bark](https://github.com/suno-ai/bark) — TTS model
 - [PyMuPDF](https://pymupdf.readthedocs.io/) — PDF text extraction
 - [NLTK](https://www.nltk.org/) — Sentence tokenization
-
 
 
